@@ -12,7 +12,7 @@ class WorkmateApp extends StatelessWidget {
     return MaterialApp(
       title: 'Workmate Private',
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.green,
         useMaterial3: true,
       ),
       home: const HomePage(),
