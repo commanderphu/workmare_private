@@ -2,13 +2,17 @@
 Workmate Private Backend API
 Intelligent document and task management for ADHD
 """
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import time
+
+START_TIME = time.time()
 
 app = FastAPI(
     title="Workmate Private API",
     description="Intelligent document and task management for ADHD",
-    version="0.1.0"
+    version="0.1.0",
 )
 
 # CORS Middleware
@@ -27,11 +31,12 @@ def root():
     return {
         "message": "Workmate Private API",
         "version": "0.1.0",
-        "status": "Development"
+        "status": "Development",
     }
 
 
 @app.get("/health")
 def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    uptime_seconds = int(time.time() - START_TIME)
+    return {"status": "healthy", "uptime_seconds": f" Seit {uptime_seconds} Sekunden"}

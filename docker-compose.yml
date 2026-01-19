@@ -1,31 +1,57 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: workmate
+      POSTGRES_PASSWORD: workmate
+      POSTGRES_DB: workmate
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+  
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=sqlite:///./workmate.db
-      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
-      - ENVIRONMENT=development
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./backend:/app
-      - backend_data:/app/data
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-
-  # PostgreSQL (optional, für spätere Migration)
-  # postgres:
-  #   image: postgres:15-alpine
-  #   environment:
-  #     POSTGRES_USER: workmate
-  #     POSTGRES_PASSWORD: workmate
-  #     POSTGRES_DB: workmate
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
+      - ./data:/app/data
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env
+  
+  celery:
+    build: ./backend
+    command: celery -A app.celery worker --loglevel=info
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    depends_on:
+      - redis
+      - postgres
+    env_file:
+      - .env
+  
+  celery-beat:
+    build: ./backend
+    command: celery -A app.celery beat --loglevel=info
+    volumes:
+      - ./backend:/app
+    depends_on:
+      - redis
+    env_file:
+      - .env
 
 volumes:
-  backend_data:
-  # postgres_data:
+  postgres_data:
