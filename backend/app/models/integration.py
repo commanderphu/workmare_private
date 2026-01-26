@@ -8,7 +8,7 @@ from datetime import datetime
 import uuid
 import enum
 
-from ..core.database import Base
+from ..db.base import Base
 
 
 class IntegrationType(str, enum.Enum):
