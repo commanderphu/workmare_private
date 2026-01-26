@@ -6,15 +6,15 @@ class ApiConfig {
   static const int connectTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000;
 
-  // API Endpoints
+  // API Endpoints (with trailing slashes for FastAPI)
   static const String authLogin = '/auth/login';
   static const String authRegister = '/auth/register';
   static const String authMe = '/auth/me';
   static const String authLogout = '/auth/logout';
 
-  static const String tasks = '/tasks';
+  static const String tasks = '/tasks/';
   static String taskById(String id) => '/tasks/$id';
 
-  static const String documents = '/documents';
+  static const String documents = '/documents/';
   static String documentById(String id) => '/documents/$id';
 }

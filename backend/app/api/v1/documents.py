@@ -15,6 +15,7 @@ from ...models.file import File as FileModel
 from ...schemas.document import DocumentResponse, DocumentWithFileResponse, DocumentUpdate
 from ...services.file_storage import FileStorageService
 from ...core.config import settings
+from ...tasks.document_processing import process_document
 
 router = APIRouter()
 file_storage = FileStorageService()
@@ -84,8 +85,8 @@ async def upload_document(
     db.commit()
     db.refresh(db_document)
 
-    # TODO: Trigger background processing (OCR + AI analysis)
-    # This will be done via Celery task
+    # Trigger background processing (OCR + AI analysis)
+    process_document.delay(str(db_document.id))
 
     return db_document
 

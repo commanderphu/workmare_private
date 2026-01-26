@@ -7,6 +7,7 @@ class Task {
   final String priority;
   final double? amount;
   final String? currency;
+  final String? documentId;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime? completedAt;
@@ -20,6 +21,7 @@ class Task {
     required this.priority,
     this.amount,
     this.currency,
+    this.documentId,
     required this.createdAt,
     required this.updatedAt,
     this.completedAt,
@@ -35,6 +37,7 @@ class Task {
       priority: json['priority'] as String? ?? 'medium',
       amount: json['amount'] != null ? (json['amount'] as num).toDouble() : null,
       currency: json['currency'] as String?,
+      documentId: json['document_id'] as String?,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       completedAt: json['completed_at'] != null ? DateTime.parse(json['completed_at']) : null,
@@ -75,6 +78,7 @@ class Task {
       priority: priority ?? this.priority,
       amount: amount ?? this.amount,
       currency: currency ?? this.currency,
+      documentId: documentId,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
       completedAt: completedAt,

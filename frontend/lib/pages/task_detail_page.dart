@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../models/task.dart';
 import '../providers/task_provider.dart';
+import 'document_detail_page.dart';
 
 class TaskDetailPage extends StatefulWidget {
   final Task task;
@@ -199,6 +200,12 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           _buildAmountCard(),
         ],
 
+        // Document Link
+        if (_currentTask.documentId != null) ...[
+          const SizedBox(height: 16),
+          _buildDocumentLinkCard(),
+        ],
+
         // Timestamps
         const SizedBox(height: 16),
         _buildTimestamps(),
@@ -278,6 +285,34 @@ class _TaskDetailPageState extends State<TaskDetailPage> {
           '${_currentTask.amount!.toStringAsFixed(2)} ${_currentTask.currency ?? 'EUR'}',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDocumentLinkCard() {
+    return Card(
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(Icons.description, color: Colors.blue),
+        ),
+        title: const Text('Zugehöriges Dokument'),
+        subtitle: const Text('Tippen um Dokument anzuzeigen'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => DocumentDetailPage(
+                documentId: _currentTask.documentId!,
+              ),
+            ),
+          );
+        },
       ),
     );
   }

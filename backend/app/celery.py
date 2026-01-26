@@ -11,9 +11,10 @@ celery_app = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
 )
 
-celery_app.conf.task_routes = {
-    "app.tasks.*": "main-queue",
-}
+# Use default queue (celery) for all tasks
+# celery_app.conf.task_routes = {
+#     "app.tasks.*": "main-queue",
+# }
 
 celery_app.conf.update(
     task_serializer="json",
@@ -22,3 +23,6 @@ celery_app.conf.update(
     timezone="UTC",
     enable_utc=True,
 )
+
+# Auto-discover tasks in the tasks module
+celery_app.autodiscover_tasks(['app.tasks'])

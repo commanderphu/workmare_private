@@ -27,10 +27,16 @@ class Settings(BaseSettings):
 
     # AI
     CLAUDE_API_KEY: Optional[str] = None
+    OPENAI_API_KEY: Optional[str] = None
     OLLAMA_URL: str = "http://localhost:11434"
 
     # CORS
-    ALLOWED_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:8080"]
+    ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://192.168.178.100:3000",
+    ]
 
     # File Storage
     UPLOAD_DIR: str = "./data/uploads"

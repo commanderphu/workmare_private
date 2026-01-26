@@ -3,9 +3,10 @@ OCR Service using Tesseract
 """
 
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 from pathlib import Path
 from typing import Optional
+import numpy as np
 
 
 class OCRService:
@@ -16,12 +17,49 @@ class OCRService:
         # For German language support
         self.languages = 'deu+eng'
 
-    def extract_text(self, image_path: Path) -> tuple[str, float]:
+    def preprocess_image(self, image: Image.Image) -> Image.Image:
+        """
+        Preprocess image for better OCR results
+
+        Applies:
+        - Grayscale conversion
+        - Contrast enhancement
+        - Noise reduction (light denoising)
+        - Sharpening
+
+        Args:
+            image: PIL Image object
+
+        Returns:
+            Preprocessed PIL Image
+        """
+        # Convert to grayscale
+        if image.mode != 'L':
+            image = image.convert('L')
+
+        # Enhance contrast
+        enhancer = ImageEnhance.Contrast(image)
+        image = enhancer.enhance(1.5)  # Increase contrast by 50%
+
+        # Denoise - light median filter to reduce noise while preserving edges
+        image = image.filter(ImageFilter.MedianFilter(size=3))
+
+        # Sharpen to improve text edges
+        image = image.filter(ImageFilter.SHARPEN)
+
+        # Optional: Increase brightness slightly
+        brightness_enhancer = ImageEnhance.Brightness(image)
+        image = brightness_enhancer.enhance(1.1)
+
+        return image
+
+    def extract_text(self, image_path: Path, preprocess: bool = True) -> tuple[str, float]:
         """
         Extract text from an image file
 
         Args:
             image_path: Path to the image file
+            preprocess: Whether to apply image preprocessing (default: True)
 
         Returns:
             tuple: (extracted_text, confidence_score)
@@ -29,6 +67,10 @@ class OCRService:
         try:
             # Open image
             image = Image.open(image_path)
+
+            # Apply preprocessing if enabled
+            if preprocess:
+                image = self.preprocess_image(image)
 
             # Get detailed OCR data for confidence
             data = pytesseract.image_to_data(
@@ -82,17 +124,22 @@ class OCRService:
         except Exception as e:
             raise Exception(f"PDF extraction failed: {str(e)}")
 
-    def extract_text_from_pil_image(self, image: Image) -> tuple[str, float]:
+    def extract_text_from_pil_image(self, image: Image, preprocess: bool = True) -> tuple[str, float]:
         """
         Extract text from PIL Image object
 
         Args:
             image: PIL Image object
+            preprocess: Whether to apply image preprocessing (default: True)
 
         Returns:
             tuple: (extracted_text, confidence_score)
         """
         try:
+            # Apply preprocessing if enabled
+            if preprocess:
+                image = self.preprocess_image(image)
+
             # Get detailed OCR data for confidence
             data = pytesseract.image_to_data(
                 image,

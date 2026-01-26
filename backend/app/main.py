@@ -9,6 +9,7 @@ import time
 
 from .core.config import settings
 from .api.v1 import api_router
+from .api.v1.files import router as files_router
 
 START_TIME = time.time()
 
@@ -30,6 +31,9 @@ app.add_middleware(
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_PREFIX)
+
+# Include files router (outside /api/v1 for direct file access)
+app.include_router(files_router, prefix="/files", tags=["files"])
 
 
 @app.get("/")
