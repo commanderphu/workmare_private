@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import '../models/calendar_event.dart';
 import '../models/integration.dart';
 import 'api_service.dart';
@@ -27,7 +26,7 @@ class CalendarService {
       }
 
       final response = await _apiService.get(
-        '${ApiConfig.Endpoints.calendar}/events/',
+        '${ApiConfig.calendar}/events/',
         queryParameters: queryParams,
       );
 
@@ -41,7 +40,7 @@ class CalendarService {
   Future<CalendarEvent> getEvent(String eventId) async {
     try {
       final response = await _apiService.get(
-        '${ApiConfig.Endpoints.calendar}/events/$eventId',
+        '${ApiConfig.calendar}/events/$eventId',
       );
       return CalendarEvent.fromJson(response.data);
     } catch (e) {
@@ -61,7 +60,7 @@ class CalendarService {
   }) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/events/',
+        '${ApiConfig.calendar}/events/',
         data: {
           'title': title,
           'start_time': startTime.toIso8601String(),
@@ -98,7 +97,7 @@ class CalendarService {
       if (location != null) data['location'] = location;
 
       final response = await _apiService.patch(
-        '${ApiConfig.Endpoints.calendar}/events/$eventId',
+        '${ApiConfig.calendar}/events/$eventId',
         data: data,
       );
       return CalendarEvent.fromJson(response.data);
@@ -110,7 +109,7 @@ class CalendarService {
   Future<void> deleteEvent(String eventId) async {
     try {
       await _apiService.delete(
-        '${ApiConfig.Endpoints.calendar}/events/$eventId',
+        '${ApiConfig.calendar}/events/$eventId',
       );
     } catch (e) {
       throw Exception('Failed to delete calendar event: $e');
@@ -123,7 +122,7 @@ class CalendarService {
   ) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/events/$eventId/resolve-conflict',
+        '${ApiConfig.calendar}/events/$eventId/resolve-conflict',
         queryParameters: {'resolution': resolution},
       );
       return CalendarEvent.fromJson(response.data);
@@ -142,7 +141,7 @@ class CalendarService {
       }
 
       final response = await _apiService.get(
-        '${ApiConfig.Endpoints.calendar}/integrations/',
+        '${ApiConfig.calendar}/integrations/',
         queryParameters: queryParams,
       );
 
@@ -156,7 +155,7 @@ class CalendarService {
   Future<Integration> getIntegration(String integrationId) async {
     try {
       final response = await _apiService.get(
-        '${ApiConfig.Endpoints.calendar}/integrations/$integrationId',
+        '${ApiConfig.calendar}/integrations/$integrationId',
       );
       return Integration.fromJson(response.data);
     } catch (e) {
@@ -176,7 +175,7 @@ class CalendarService {
   }) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/integrations/',
+        '${ApiConfig.calendar}/integrations/',
         data: {
           'name': name,
           'integration_type': integrationType,
@@ -217,7 +216,7 @@ class CalendarService {
       if (credentials != null) data['credentials'] = credentials;
 
       final response = await _apiService.patch(
-        '${ApiConfig.Endpoints.calendar}/integrations/$integrationId',
+        '${ApiConfig.calendar}/integrations/$integrationId',
         data: data,
       );
       return Integration.fromJson(response.data);
@@ -229,7 +228,7 @@ class CalendarService {
   Future<void> deleteIntegration(String integrationId) async {
     try {
       await _apiService.delete(
-        '${ApiConfig.Endpoints.calendar}/integrations/$integrationId',
+        '${ApiConfig.calendar}/integrations/$integrationId',
       );
     } catch (e) {
       throw Exception('Failed to delete integration: $e');
@@ -239,7 +238,7 @@ class CalendarService {
   Future<Map<String, dynamic>> testIntegration(String integrationId) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/integrations/$integrationId/test',
+        '${ApiConfig.calendar}/integrations/$integrationId/test',
       );
       return response.data as Map<String, dynamic>;
     } catch (e) {
@@ -253,7 +252,7 @@ class CalendarService {
   }) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/integrations/$integrationId/sync',
+        '${ApiConfig.calendar}/integrations/$integrationId/sync',
         data: {'force': force},
       );
       return response.data as Map<String, dynamic>;
@@ -267,7 +266,7 @@ class CalendarService {
   Future<Map<String, dynamic>> syncAllTasks({bool force = false}) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/tasks/sync-all',
+        '${ApiConfig.calendar}/tasks/sync-all',
         queryParameters: {'force': force},
       );
       return response.data as Map<String, dynamic>;
@@ -281,7 +280,7 @@ class CalendarService {
   }) async {
     try {
       final response = await _apiService.post(
-        '${ApiConfig.Endpoints.calendar}/tasks/cleanup-completed',
+        '${ApiConfig.calendar}/tasks/cleanup-completed',
         queryParameters: {'older_than_days': olderThanDays},
       );
       return response.data as Map<String, dynamic>;

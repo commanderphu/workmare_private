@@ -18,8 +18,5 @@ class ApiConfig {
   static const String documents = '/documents/';
   static String documentById(String id) => '/documents/$id';
 
-  // Nested class for better organization
-  static class Endpoints {
-    static const String calendar = '/calendar';
-  }
+  static const String calendar = '/calendar';
 }

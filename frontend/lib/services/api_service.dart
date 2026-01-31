@@ -60,9 +60,9 @@ class ApiService {
     }
   }
 
-  Future<Response> post(String path, {dynamic data}) async {
+  Future<Response> post(String path, {dynamic data, Map<String, dynamic>? queryParameters}) async {
     try {
-      return await _dio.post(path, data: data);
+      return await _dio.post(path, data: data, queryParameters: queryParameters);
     } on DioException catch (e) {
       throw _handleError(e);
     }

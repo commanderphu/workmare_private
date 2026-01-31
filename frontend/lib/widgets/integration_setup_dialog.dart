@@ -396,7 +396,7 @@ class _IntegrationSetupDialogState extends State<IntegrationSetupDialog> {
                             color: (_testSuccess!
                                     ? Colors.green
                                     : Colors.red)
-                                .withOpacity(0.1),
+                                .withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(
                               color: _testSuccess! ? Colors.green : Colors.red,

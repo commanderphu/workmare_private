@@ -66,11 +66,6 @@ class FileUploadService {
       });
     });
 
-    // Handle cancel (when user closes picker without selecting)
-    uploadInput.onCancel.listen((e) {
-      completer.complete(null);
-    });
-
     return completer.future;
   }
 }

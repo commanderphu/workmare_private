@@ -184,8 +184,8 @@ class _IntegrationsPageState extends State<IntegrationsPage> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: integration.enabled
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
+                    ? Colors.green.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -304,7 +304,7 @@ class _IntegrationsPageState extends State<IntegrationsPage> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.1),
+                        color: Colors.red.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Row(
