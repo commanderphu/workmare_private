@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     libopenjp2-7-dev \
     libtiff-dev \
     libwebp-dev \
+    poppler-utils \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 

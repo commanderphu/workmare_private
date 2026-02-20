@@ -12,6 +12,7 @@ from ..models import CalendarEvent, Integration, User
 from ..models.calendar_event import CalendarSyncStatus
 from ..models.integration import IntegrationType, SyncDirection
 from .caldav_service import CalDAVService
+from .google_calendar_service import GoogleCalendarService
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +62,7 @@ class CalendarSyncService:
             if integration.integration_type == IntegrationType.CALDAV:
                 result = await self._sync_caldav(integration, user)
             elif integration.integration_type == IntegrationType.GOOGLE_CALENDAR:
-                # TODO: Implement Google Calendar sync
-                logger.warning("Google Calendar sync not yet implemented")
-                result.errors += 1
-                result.error_messages.append("Google Calendar sync not yet implemented")
+                result = await self._sync_google_calendar(integration, user)
             elif integration.integration_type == IntegrationType.OUTLOOK_CALENDAR:
                 # TODO: Implement Outlook Calendar sync
                 logger.warning("Outlook Calendar sync not yet implemented")
@@ -330,6 +328,223 @@ class CalendarSyncService:
         local_event.sync_status = CalendarSyncStatus.SYNCED
         local_event.last_synced_at = datetime.utcnow()
         local_event.conflict_data = None  # Clear any previous conflict data
+
+    async def _sync_google_calendar(self, integration: Integration, user: User) -> SyncResult:
+        """
+        Sync Google Calendar integration
+
+        Args:
+            integration: Google Calendar integration
+            user: User who owns the integration
+
+        Returns:
+            SyncResult with statistics
+        """
+        result = SyncResult()
+
+        try:
+            # Initialize Google Calendar service with OAuth credentials
+            google_service = GoogleCalendarService(integration.credentials)
+
+            calendar_id = integration.config.get('calendar_id', 'primary')
+
+            # Sync based on direction
+            if integration.sync_direction == SyncDirection.FROM_CALENDAR:
+                # Only pull from external calendar
+                await self._pull_from_google(google_service, calendar_id, integration, user, result)
+
+            elif integration.sync_direction == SyncDirection.TO_CALENDAR:
+                # Only push to external calendar
+                await self._push_to_google(google_service, calendar_id, integration, user, result)
+
+            elif integration.sync_direction == SyncDirection.BIDIRECTIONAL:
+                # Both directions - pull first, then push
+                await self._pull_from_google(google_service, calendar_id, integration, user, result)
+                await self._push_to_google(google_service, calendar_id, integration, user, result)
+
+            # Update credentials in case token was refreshed
+            updated_creds = google_service.get_updated_credentials()
+            integration.credentials = updated_creds
+            self.db.commit()
+
+        except Exception as e:
+            logger.error(f"Google Calendar sync error: {e}")
+            result.errors += 1
+            result.error_messages.append(f"Google Calendar error: {str(e)}")
+
+        return result
+
+    async def _pull_from_google(
+        self,
+        google_service: GoogleCalendarService,
+        calendar_id: str,
+        integration: Integration,
+        user: User,
+        result: SyncResult
+    ):
+        """
+        Pull events from Google Calendar to local database
+
+        Creates new events or updates existing ones
+        """
+        try:
+            # Fetch events from last 30 days to next 365 days
+            start_date = datetime.utcnow() - timedelta(days=30)
+            end_date = datetime.utcnow() + timedelta(days=365)
+
+            external_events = await google_service.get_events(
+                calendar_id=calendar_id,
+                start_date=start_date,
+                end_date=end_date
+            )
+
+            for ext_event in external_events:
+                try:
+                    # Check if event already exists locally
+                    local_event = self.db.query(CalendarEvent).filter(
+                        CalendarEvent.external_event_id == ext_event['id'],
+                        CalendarEvent.user_id == user.id
+                    ).first()
+
+                    if local_event:
+                        # Event exists - check for conflicts
+                        conflict = self._detect_conflict(local_event, ext_event)
+
+                        if conflict:
+                            # Store conflict data and mark as conflict
+                            local_event.sync_status = CalendarSyncStatus.CONFLICT
+                            local_event.conflict_data = {
+                                "local": {
+                                    "title": local_event.title,
+                                    "start_time": local_event.start_time.isoformat(),
+                                    "end_time": local_event.end_time.isoformat(),
+                                    "description": local_event.description,
+                                    "location": local_event.location,
+                                },
+                                "remote": {
+                                    "title": ext_event['title'],
+                                    "start_time": ext_event['start_time'].isoformat(),
+                                    "end_time": ext_event['end_time'].isoformat(),
+                                    "description": ext_event['description'],
+                                    "location": ext_event['location'],
+                                },
+                                "detected_at": datetime.utcnow().isoformat()
+                            }
+                            result.conflicts += 1
+                            logger.warning(f"Conflict detected for event {local_event.id}")
+
+                        elif local_event.last_synced_at and ext_event.get('last_modified'):
+                            # Remote is newer - update local
+                            if ext_event['last_modified'] > local_event.last_synced_at:
+                                local_event.title = ext_event['title']
+                                local_event.description = ext_event.get('description', '')
+                                local_event.start_time = ext_event['start_time']
+                                local_event.end_time = ext_event['end_time']
+                                local_event.location = ext_event.get('location', '')
+                                local_event.all_day = ext_event.get('all_day', False)
+                                local_event.sync_status = CalendarSyncStatus.SYNCED
+                                local_event.last_synced_at = datetime.utcnow()
+                                result.events_updated += 1
+                                logger.info(f"Updated local event {local_event.id} from Google Calendar")
+                    else:
+                        # New event from Google Calendar - create locally
+                        new_event = CalendarEvent(
+                            user_id=user.id,
+                            title=ext_event['title'],
+                            description=ext_event.get('description', ''),
+                            start_time=ext_event['start_time'],
+                            end_time=ext_event['end_time'],
+                            location=ext_event.get('location', ''),
+                            all_day=ext_event.get('all_day', False),
+                            external_event_id=ext_event['id'],
+                            external_calendar_id=integration.id,
+                            sync_status=CalendarSyncStatus.SYNCED,
+                            last_synced_at=datetime.utcnow()
+                        )
+                        self.db.add(new_event)
+                        result.events_pulled += 1
+                        logger.info(f"Created new local event from Google Calendar: {ext_event['title']}")
+
+                except Exception as e:
+                    logger.error(f"Error processing Google event {ext_event.get('title', 'unknown')}: {e}")
+                    result.errors += 1
+                    result.error_messages.append(f"Event pull error: {str(e)}")
+
+            self.db.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to pull from Google Calendar: {e}")
+            result.errors += 1
+            result.error_messages.append(f"Pull error: {str(e)}")
+
+    async def _push_to_google(
+        self,
+        google_service: GoogleCalendarService,
+        calendar_id: str,
+        integration: Integration,
+        user: User,
+        result: SyncResult
+    ):
+        """
+        Push local events to Google Calendar
+
+        Only pushes events that need syncing (pending or modified)
+        """
+        try:
+            # Find all events that need to be pushed
+            pending_events = self.db.query(CalendarEvent).filter(
+                CalendarEvent.user_id == user.id,
+                CalendarEvent.external_calendar_id == integration.id,
+                CalendarEvent.sync_status == CalendarSyncStatus.PENDING
+            ).all()
+
+            for event in pending_events:
+                try:
+                    if event.external_event_id:
+                        # Update existing event
+                        await google_service.update_event(
+                            calendar_id=calendar_id,
+                            event_id=event.external_event_id,
+                            title=event.title,
+                            start_time=event.start_time,
+                            end_time=event.end_time,
+                            description=event.description,
+                            location=event.location,
+                            all_day=event.all_day
+                        )
+                        result.events_updated += 1
+                        logger.info(f"Updated Google Calendar event: {event.title}")
+                    else:
+                        # Create new event
+                        created_event = await google_service.create_event(
+                            calendar_id=calendar_id,
+                            title=event.title,
+                            start_time=event.start_time,
+                            end_time=event.end_time,
+                            description=event.description,
+                            location=event.location,
+                            all_day=event.all_day
+                        )
+                        event.external_event_id = created_event['id']
+                        result.events_pushed += 1
+                        logger.info(f"Created new Google Calendar event: {event.title}")
+
+                    # Mark as synced
+                    event.sync_status = CalendarSyncStatus.SYNCED
+                    event.last_synced_at = datetime.utcnow()
+
+                except Exception as e:
+                    logger.error(f"Error pushing event {event.title} to Google: {e}")
+                    event.sync_status = CalendarSyncStatus.FAILED
+                    result.errors += 1
+                    result.error_messages.append(f"Push error for '{event.title}': {str(e)}")
+
+            self.db.commit()
+
+        except Exception as e:
+            logger.error(f"Failed to push to Google Calendar: {e}")
+            result.errors += 1
+            result.error_messages.append(f"Push error: {str(e)}")
 
     async def resolve_conflict(
         self,

@@ -1,57 +1,65 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:14-alpine
-    environment:
-      POSTGRES_USER: workmate
-      POSTGRES_PASSWORD: workmate
-      POSTGRES_DB: workmate
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
-  
-  redis:
+  workmate_private_redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
-  
-  backend:
+    container_name: workmate_private_redis
+    restart: unless-stopped
+    networks:
+      - core_network
+
+  workmate_private_backend:
     build: ./backend
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    container_name: workmate_private_backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./backend:/app
       - ./data:/app/data
-    ports:
-      - "8000:8000"
     depends_on:
-      - postgres
-      - redis
+      - workmate_private_redis
     env_file:
       - .env
-  
-  celery:
+    restart: unless-stopped
+    networks:
+      - core_network
+
+  workmate_private_celery:
     build: ./backend
+    container_name: workmate_private_celery
     command: celery -A app.celery worker --loglevel=info
     volumes:
       - ./backend:/app
       - ./data:/app/data
     depends_on:
-      - redis
-      - postgres
+      - workmate_private_redis
     env_file:
       - .env
-  
-  celery-beat:
+    restart: unless-stopped
+    networks:
+      - core_network
+
+  workmate_private_celery_beat:
     build: ./backend
+    container_name: workmate_private_celery_beat
     command: celery -A app.celery beat --loglevel=info
     volumes:
       - ./backend:/app
     depends_on:
-      - redis
+      - workmate_private_redis
     env_file:
       - .env
+    restart: unless-stopped
+    networks:
+      - core_network
 
-volumes:
-  postgres_data:
+  workmate_private_ui:
+    build:
+      context: ./frontend
+      args:
+        API_URL: ${API_URL:-https://api.workmate-private.intern.phudevelopement.xyz/api/v1}
+    container_name: workmate_private_ui
+    restart: unless-stopped
+    networks:
+      - core_network
+
+networks:
+  core_network:
+    external: true

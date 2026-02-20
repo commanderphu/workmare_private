@@ -2,11 +2,15 @@
 Calendar and Integration management endpoints
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timedelta
 import uuid
+
+from google_auth_oauthlib.flow import Flow
+from google.oauth2.credentials import Credentials
 
 from ...db.session import get_db
 from ...schemas import (
@@ -24,8 +28,10 @@ from ...models.calendar_event import CalendarSyncStatus
 from ...models.integration import IntegrationType, SyncDirection
 from ..dependencies import get_current_user
 from ...services.caldav_service import CalDAVService
+from ...services.google_calendar_service import GoogleCalendarService
 from ...services.calendar_sync_service import CalendarSyncService
 from ...services.task_event_mapping_service import TaskEventMappingService
+from ...core.config import settings
 
 router = APIRouter(prefix="/calendar", tags=["Calendar"])
 
@@ -436,8 +442,26 @@ async def test_integration(
                     "success": False,
                     "message": "Connection failed"
                 }
+        elif integration.integration_type == IntegrationType.GOOGLE_CALENDAR:
+            # Test Google Calendar connection
+            if not integration.credentials:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Missing Google OAuth credentials"
+                )
+
+            google_service = GoogleCalendarService(integration.credentials)
+            result = await google_service.test_connection()
+
+            # Update credentials in case token was refreshed
+            updated_creds = google_service.get_updated_credentials()
+            integration.credentials = updated_creds
+            db.commit()
+
+            return result
+
         else:
-            # TODO: Implement Google Calendar and Outlook tests
+            # TODO: Implement Outlook Calendar test
             raise HTTPException(
                 status_code=status.HTTP_501_NOT_IMPLEMENTED,
                 detail=f"Testing for {integration.integration_type.value} not yet implemented"
@@ -591,3 +615,147 @@ def cleanup_completed_task_events(
         "message": f"Removed {deleted_count} completed task events",
         "deleted_count": deleted_count
     }
+
+
+# ===== Google Calendar OAuth Endpoints =====
+
+@router.get("/oauth/google/authorize")
+def google_oauth_authorize(
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Initiate Google OAuth2 flow
+
+    Redirects user to Google's OAuth consent screen
+    """
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth not configured. Please set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env"
+        )
+
+    # Create OAuth flow
+    flow = Flow.from_client_config(
+        client_config={
+            "web": {
+                "client_id": settings.GOOGLE_CLIENT_ID,
+                "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                "token_uri": "https://oauth2.googleapis.com/token",
+                "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
+            }
+        },
+        scopes=['https://www.googleapis.com/auth/calendar']
+    )
+    flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+
+    # Generate authorization URL
+    authorization_url, state = flow.authorization_url(
+        access_type='offline',  # Get refresh token
+        include_granted_scopes='true',
+        prompt='consent',  # Force consent screen to get refresh token
+        state=str(current_user.id)  # Pass user ID in state for callback
+    )
+
+    return {"authorization_url": authorization_url}
+
+
+@router.get("/oauth/google/callback")
+async def google_oauth_callback(
+    request: Request,
+    code: str,
+    state: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Google OAuth2 callback endpoint
+
+    Exchanges authorization code for access/refresh tokens and creates integration
+    """
+    if not settings.GOOGLE_CLIENT_ID or not settings.GOOGLE_CLIENT_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Google OAuth not configured"
+        )
+
+    try:
+        # Recreate the flow
+        flow = Flow.from_client_config(
+            client_config={
+                "web": {
+                    "client_id": settings.GOOGLE_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_CLIENT_SECRET,
+                    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+                    "token_uri": "https://oauth2.googleapis.com/token",
+                    "redirect_uris": [settings.GOOGLE_REDIRECT_URI],
+                }
+            },
+            scopes=['https://www.googleapis.com/auth/calendar']
+        )
+        flow.redirect_uri = settings.GOOGLE_REDIRECT_URI
+
+        # Exchange authorization code for tokens
+        flow.fetch_token(code=code)
+        credentials = flow.credentials
+
+        # Get user ID from state
+        user_id = uuid.UUID(state)
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Store credentials and create integration
+        credentials_dict = {
+            'access_token': credentials.token,
+            'refresh_token': credentials.refresh_token,
+            'token_uri': credentials.token_uri,
+            'scopes': credentials.scopes,
+        }
+
+        # Initialize Google Calendar service to get calendar list
+        google_service = GoogleCalendarService(credentials_dict)
+        calendars = await google_service.list_calendars()
+
+        # Find primary calendar
+        primary_calendar = next((cal for cal in calendars if cal.get('primary')), calendars[0] if calendars else None)
+
+        if not primary_calendar:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="No calendars found in Google account"
+            )
+
+        # Create integration
+        integration = Integration(
+            user_id=user.id,
+            name=f"Google Calendar - {primary_calendar['name']}",
+            integration_type=IntegrationType.GOOGLE_CALENDAR,
+            config={
+                'calendar_id': primary_calendar['id'],
+                'calendar_name': primary_calendar['name'],
+                'timezone': primary_calendar.get('timezone', 'UTC'),
+            },
+            credentials=credentials_dict,
+            enabled=True,
+            sync_direction=SyncDirection.BIDIRECTIONAL,
+            auto_sync=True,
+            sync_interval_minutes=15
+        )
+        db.add(integration)
+        db.commit()
+        db.refresh(integration)
+
+        # Return success page or redirect
+        return {
+            "success": True,
+            "message": "Google Calendar connected successfully",
+            "integration_id": str(integration.id),
+            "calendar_name": primary_calendar['name'],
+            "available_calendars": calendars
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"OAuth callback failed: {str(e)}"
+        )

@@ -57,46 +57,39 @@ class ClaudeService:
         """
         prompt = self._build_analysis_prompt(text, document_type)
 
-        try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=2048,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
-            )
-
-            # Extract JSON from response
-            result_text = response.content[0].text
-
-            # Parse JSON response
+        # Try Claude first if available
+        if self.claude_client:
             try:
-                # Try to extract JSON from markdown code blocks
-                if "```json" in result_text:
-                    json_str = result_text.split("```json")[1].split("```")[0].strip()
-                elif "```" in result_text:
-                    json_str = result_text.split("```")[1].split("```")[0].strip()
+                logger.info("Attempting document analysis with Claude")
+                response = self.claude_client.messages.create(
+                    model=self.claude_model,
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                result_text = response.content[0].text
+                return self._parse_ai_response(result_text, document_type)
+            except Exception as e:
+                logger.warning(f"Claude analysis failed: {str(e)}")
+                if self.openai_client:
+                    logger.info("Falling back to OpenAI for text analysis")
                 else:
-                    json_str = result_text
+                    raise Exception(f"Claude AI analysis failed and no OpenAI fallback: {str(e)}")
 
-                metadata = json.loads(json_str)
-                return metadata
+        # Fallback to OpenAI
+        if self.openai_client:
+            try:
+                logger.info("Using OpenAI for text analysis")
+                response = self.openai_client.chat.completions.create(
+                    model=self.openai_model,
+                    messages=[{"role": "user", "content": prompt}],
+                    max_tokens=2048
+                )
+                result_text = response.choices[0].message.content
+                return self._parse_ai_response(result_text, document_type)
+            except Exception as e:
+                raise Exception(f"OpenAI analysis failed: {str(e)}")
 
-            except json.JSONDecodeError as e:
-                # Fallback: return basic structure
-                return {
-                    "type": document_type or "other",
-                    "title": "Unbekanntes Dokument",
-                    "confidence": 0.3,
-                    "error": f"Failed to parse AI response: {str(e)}",
-                    "raw_response": result_text
-                }
-
-        except Exception as e:
-            raise Exception(f"Claude AI analysis failed: {str(e)}")
+        raise Exception("No AI service available for document analysis")
 
     def analyze_document_image(
         self,

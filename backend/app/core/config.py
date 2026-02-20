@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = "development"
 
     # Database
-    DATABASE_URL: str = "sqlite:///./workmate.db"
+    DATABASE_URL: str = "postgresql+psycopg2://workmate_private:workmate_private@central_postgres:5432/workmate_private"
 
     # Security
     SECRET_KEY: str = "your-secret-key-here-change-in-production"
@@ -36,6 +36,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:3000",
         "http://localhost:8080",
         "http://192.168.178.100:3000",
+        "https://workmate-private.intern.phudevelopement.xyz",
     ]
 
     # File Storage
@@ -43,8 +44,13 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
 
     # Celery (for background tasks)
-    CELERY_BROKER_URL: str = "redis://localhost:6379/0"
-    CELERY_RESULT_BACKEND: str = "redis://localhost:6379/0"
+    CELERY_BROKER_URL: str = "redis://workmate_private_redis:6379/0"
+    CELERY_RESULT_BACKEND: str = "redis://workmate_private_redis:6379/0"
+
+    # Google Calendar OAuth
+    GOOGLE_CLIENT_ID: Optional[str] = None
+    GOOGLE_CLIENT_SECRET: Optional[str] = None
+    GOOGLE_REDIRECT_URI: str = "https://api.workmate-private.intern.phudevelopement.xyz/api/v1/calendar/oauth/google/callback"
 
     model_config = SettingsConfigDict(
         env_file=".env",
