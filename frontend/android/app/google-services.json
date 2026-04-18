@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1036924064365",
+    "project_id": "workmate-private-55afd",
+    "storage_bucket": "workmate-private-55afd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1036924064365:android:af5cafe1afd36a5f92e564",
+        "android_client_info": {
+          "package_name": "xyz.phudevelopement.workmate_private"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD7srWTH7Kvo91ibC2nmgTXgaTw3-sU4Dw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
+import 'firebase_options.dart';
 import 'providers/auth_provider.dart';
 import 'providers/document_provider.dart';
 import 'providers/task_provider.dart';
 import 'providers/theme_provider.dart';
 import 'pages/dashboard_page.dart';
 import 'pages/login_page.dart';
+import 'services/push_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
   await dotenv.load(fileName: '.env');
+
+  // Initialize Firebase (requires google-services.json / GoogleService-Info.plist)
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   runApp(
     MultiProvider(
@@ -53,10 +59,12 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
+  final _pushService = PushNotificationService();
+  bool _pushInitialized = false;
+
   @override
   void initState() {
     super.initState();
-    // Initialize auth state
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().initialize();
     });
@@ -66,22 +74,24 @@ class _AuthWrapperState extends State<AuthWrapper> {
   Widget build(BuildContext context) {
     return Consumer<AuthProvider>(
       builder: (context, authProvider, child) {
-        // Show loading while initializing
         if (authProvider.status == AuthStatus.initial ||
             authProvider.status == AuthStatus.loading) {
           return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
-        // Show login page if not authenticated
         if (authProvider.status == AuthStatus.unauthenticated) {
+          _pushInitialized = false;
           return const LoginPage();
         }
 
-        // Show dashboard if authenticated
+        // Initialize push notifications once after login
+        if (!_pushInitialized) {
+          _pushInitialized = true;
+          _pushService.initialize();
+        }
+
         return const DashboardPage();
       },
     );

@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/push_notification_service.dart';
 
 enum AuthStatus { initial, authenticated, unauthenticated, loading }
 
@@ -101,6 +102,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
+      await PushNotificationService().unregisterToken();
       await _authService.logout();
     } finally {
       _user = null;

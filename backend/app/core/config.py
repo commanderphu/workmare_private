@@ -52,6 +52,9 @@ class Settings(BaseSettings):
     GOOGLE_CLIENT_SECRET: Optional[str] = None
     GOOGLE_REDIRECT_URI: str = "https://api.workmate-private.intern.phudevelopement.xyz/api/v1/calendar/oauth/google/callback"
 
+    # Firebase Push Notifications
+    FIREBASE_CREDENTIALS_PATH: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

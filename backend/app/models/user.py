@@ -30,6 +30,9 @@ class User(Base):
     notification_preferences = Column(JSON, default={})
     ui_preferences = Column(JSON, default={})
 
+    # Push Notifications
+    fcm_token = Column(String(255), nullable=True)
+
     # Status
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
