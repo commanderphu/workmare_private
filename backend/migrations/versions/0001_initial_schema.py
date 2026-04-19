@@ -27,7 +27,6 @@ def upgrade() -> None:
         sa.Column('language', sa.String(10), nullable=True),
         sa.Column('notification_preferences', sa.JSON(), nullable=True),
         sa.Column('ui_preferences', sa.JSON(), nullable=True),
-        sa.Column('fcm_token', sa.String(255), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=True),
         sa.Column('is_verified', sa.Boolean(), nullable=True),
         sa.Column('two_factor_enabled', sa.Boolean(), nullable=True),
