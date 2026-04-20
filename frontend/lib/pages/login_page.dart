@@ -9,35 +9,70 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _isPasswordVisible = false;
+class _LoginPageState extends State<LoginPage>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+
+  // Login
+  final _loginFormKey = GlobalKey<FormState>();
+  final _loginUsernameController = TextEditingController();
+  final _loginPasswordController = TextEditingController();
+  bool _loginPasswordVisible = false;
+
+  // Register
+  final _registerFormKey = GlobalKey<FormState>();
+  final _registerUsernameController = TextEditingController();
+  final _registerEmailController = TextEditingController();
+  final _registerPasswordController = TextEditingController();
+  final _registerPasswordConfirmController = TextEditingController();
+  bool _registerPasswordVisible = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+  }
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _tabController.dispose();
+    _loginUsernameController.dispose();
+    _loginPasswordController.dispose();
+    _registerUsernameController.dispose();
+    _registerEmailController.dispose();
+    _registerPasswordController.dispose();
+    _registerPasswordConfirmController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
+    if (_loginFormKey.currentState!.validate()) {
       final authProvider = context.read<AuthProvider>();
       final success = await authProvider.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
+        _loginUsernameController.text.trim(),
+        _loginPasswordController.text,
       );
-
       if (!mounted) return;
-
       if (!success && authProvider.error != null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.error!),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(authProvider.error!), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleRegister() async {
+    if (_registerFormKey.currentState!.validate()) {
+      final authProvider = context.read<AuthProvider>();
+      final success = await authProvider.register(
+        username: _registerUsernameController.text.trim(),
+        email: _registerEmailController.text.trim(),
+        password: _registerPasswordController.text,
+      );
+      if (!mounted) return;
+      if (!success && authProvider.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(authProvider.error!), backgroundColor: Colors.red),
         );
       }
     }
@@ -46,6 +81,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
+    final isLoading = authProvider.status == AuthStatus.loading;
 
     return Scaffold(
       body: Center(
@@ -53,150 +89,195 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(24.0),
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 400),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo/Title
-                  Icon(
-                    Icons.work_outline,
-                    size: 80,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Workmate Private',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'ADHD Task Management',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: Colors.grey,
-                        ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 48),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Logo
+                Icon(Icons.work_outline, size: 72,
+                    color: Theme.of(context).colorScheme.primary),
+                const SizedBox(height: 12),
+                Text('Workmate Private',
+                    style: Theme.of(context).textTheme.headlineMedium
+                        ?.copyWith(fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 4),
+                Text('ADHD Task Management',
+                    style: Theme.of(context).textTheme.bodyLarge
+                        ?.copyWith(color: Colors.grey),
+                    textAlign: TextAlign.center),
+                const SizedBox(height: 32),
 
-                  // Username Field
-                  TextFormField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your username';
-                      }
-                      return null;
-                    },
-                    textInputAction: TextInputAction.next,
-                    enabled: authProvider.status != AuthStatus.loading,
-                  ),
-                  const SizedBox(height: 16),
+                // Tabs
+                TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'Anmelden'),
+                    Tab(text: 'Registrieren'),
+                  ],
+                ),
+                const SizedBox(height: 24),
 
-                  // Password Field
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_isPasswordVisible,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock_outline),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _isPasswordVisible
-                              ? Icons.visibility
-                              : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _isPasswordVisible = !_isPasswordVisible;
-                          });
-                        },
-                      ),
-                    ),
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      return null;
-                    },
-                    textInputAction: TextInputAction.done,
-                    onFieldSubmitted: (_) => _handleLogin(),
-                    enabled: authProvider.status != AuthStatus.loading,
+                // Tab content
+                SizedBox(
+                  height: 320,
+                  child: TabBarView(
+                    controller: _tabController,
+                    children: [
+                      _buildLoginForm(isLoading),
+                      _buildRegisterForm(isLoading),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-
-                  // Login Button
-                  FilledButton(
-                    onPressed: authProvider.status == AuthStatus.loading
-                        ? null
-                        : _handleLogin,
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: authProvider.status == AuthStatus.loading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                            ),
-                          )
-                        : const Text('Login'),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Demo Credentials Hint
-                  Card(
-                    color: Colors.blue.withValues(alpha: 0.1),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline,
-                                color: Colors.blue.shade700,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Demo Credentials',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.blue.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Username: admin\nPassword: admin',
-                            style: TextStyle(
-                              fontFamily: 'monospace',
-                              color: Colors.blue.shade700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLoginForm(bool isLoading) {
+    return Form(
+      key: _loginFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _loginUsernameController,
+            decoration: const InputDecoration(
+              labelText: 'Benutzername',
+              prefixIcon: Icon(Icons.person_outline),
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) => v == null || v.isEmpty ? 'Pflichtfeld' : null,
+            textInputAction: TextInputAction.next,
+            enabled: !isLoading,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _loginPasswordController,
+            obscureText: !_loginPasswordVisible,
+            decoration: InputDecoration(
+              labelText: 'Passwort',
+              prefixIcon: const Icon(Icons.lock_outline),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_loginPasswordVisible
+                    ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(
+                    () => _loginPasswordVisible = !_loginPasswordVisible),
+              ),
+            ),
+            validator: (v) => v == null || v.isEmpty ? 'Pflichtfeld' : null,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _handleLogin(),
+            enabled: !isLoading,
+          ),
+          const SizedBox(height: 24),
+          FilledButton(
+            onPressed: isLoading ? null : _handleLogin,
+            style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16)),
+            child: isLoading
+                ? const SizedBox(height: 20, width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Anmelden'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRegisterForm(bool isLoading) {
+    return Form(
+      key: _registerFormKey,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          TextFormField(
+            controller: _registerUsernameController,
+            decoration: const InputDecoration(
+              labelText: 'Benutzername',
+              prefixIcon: Icon(Icons.person_outline),
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Pflichtfeld';
+              if (v.length < 3) return 'Mindestens 3 Zeichen';
+              return null;
+            },
+            textInputAction: TextInputAction.next,
+            enabled: !isLoading,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _registerEmailController,
+            decoration: const InputDecoration(
+              labelText: 'E-Mail',
+              prefixIcon: Icon(Icons.email_outlined),
+              border: OutlineInputBorder(),
+            ),
+            keyboardType: TextInputType.emailAddress,
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Pflichtfeld';
+              if (!v.contains('@')) return 'Ungültige E-Mail';
+              return null;
+            },
+            textInputAction: TextInputAction.next,
+            enabled: !isLoading,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _registerPasswordController,
+            obscureText: !_registerPasswordVisible,
+            decoration: InputDecoration(
+              labelText: 'Passwort',
+              prefixIcon: const Icon(Icons.lock_outline),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                icon: Icon(_registerPasswordVisible
+                    ? Icons.visibility : Icons.visibility_off),
+                onPressed: () => setState(
+                    () => _registerPasswordVisible = !_registerPasswordVisible),
+              ),
+            ),
+            validator: (v) {
+              if (v == null || v.isEmpty) return 'Pflichtfeld';
+              if (v.length < 8) return 'Mindestens 8 Zeichen';
+              return null;
+            },
+            textInputAction: TextInputAction.next,
+            enabled: !isLoading,
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _registerPasswordConfirmController,
+            obscureText: !_registerPasswordVisible,
+            decoration: const InputDecoration(
+              labelText: 'Passwort bestätigen',
+              prefixIcon: Icon(Icons.lock_outline),
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) {
+              if (v != _registerPasswordController.text)
+                return 'Passwörter stimmen nicht überein';
+              return null;
+            },
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _handleRegister(),
+            enabled: !isLoading,
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: isLoading ? null : _handleRegister,
+            style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 16)),
+            child: isLoading
+                ? const SizedBox(height: 20, width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Text('Konto erstellen'),
+          ),
+        ],
       ),
     );
   }
